@@ -202,7 +202,8 @@ def get_document_chunks(
     document_id: int,
     db: Session = Depends(get_db),
 ):
-    # ⭐ NEW: Check that the document exists
+    # ⭐ NEW: Verify document exists
+
     document = (
         db.query(Document)
         .filter(Document.id == document_id)
@@ -215,7 +216,8 @@ def get_document_chunks(
             detail="Document not found",
         )
 
-    # ⭐ NEW: Get all chunks belonging to this document
+    # ⭐ NEW: Retrieve chunks for this document
+
     chunks = (
         db.query(DocumentChunk)
         .filter(
@@ -225,7 +227,8 @@ def get_document_chunks(
         .all()
     )
 
-    # ⭐ NEW: Return structured chunk information
+    # ⭐ NEW: Return chunks
+
     return {
         "document_id": document_id,
         "filename": document.filename,
