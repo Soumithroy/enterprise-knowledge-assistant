@@ -1,0 +1,32 @@
+[1mdiff --git a/backend/app/main.py b/backend/app/main.py[m
+[1mindex c8bcd9f..a79eefd 100644[m
+[1m--- a/backend/app/main.py[m
+[1m+++ b/backend/app/main.py[m
+[36m@@ -1,6 +1,14 @@[m
+ from fastapi import FastAPI[m
+ [m
+[32m+[m[32mfrom backend.app.api.documents import router as documents_router[m
+ from backend.app.core.config import settings[m
+[32m+[m[32mfrom backend.app.core.database import Base, engine[m
+[32m+[m[32mfrom backend.app.models.document import Document[m
+[32m+[m[32mfrom backend.app.models.document_chunk import DocumentChunk[m
+[32m+[m
+[32m+[m
+[32m+[m[32m# Create database tables[m
+[32m+[m[32mBase.metadata.create_all(bind=engine)[m
+ [m
+ [m
+ app = FastAPI([m
+[36m@@ -10,6 +18,9 @@[m [mapp = FastAPI([m
+ )[m
+ [m
+ [m
+[32m+[m[32mapp.include_router(documents_router)[m
+[32m+[m
+[32m+[m
+ @app.get("/")[m
+ def root():[m
+     return {[m
+[1mdiff --git a/backend/requirements.txt b/backend/requirements.txt[m
+[1mindex a7703db..251c0a4 100644[m
+Binary files a/backend/requirements.txt and b/backend/requirements.txt differ
