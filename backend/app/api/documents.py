@@ -1,3 +1,5 @@
+import json
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -10,8 +12,12 @@ from sqlalchemy.orm import Session
 from backend.app.core.database import get_db
 from backend.app.models.document import Document
 from backend.app.models.document_chunk import DocumentChunk
+from backend.app.services.semantic_search_service import (
+    search_similar_chunks,
+)
 from backend.app.services.chunking_service import chunk_text
 from backend.app.services.document_service import extract_text_from_pdf
+from backend.app.services.embedding_service import generate_embedding
 
 
 router = APIRouter(
@@ -85,14 +91,21 @@ async def upload_document(
     )
 
     # ========================================================
-    # SAVE CHUNKS
+    # ⭐ NEW: CREATE EMBEDDINGS AND SAVE CHUNKS
     # ========================================================
 
     for index, chunk in enumerate(chunks):
+
+        # ⭐ NEW: Convert this chunk into an embedding
+        embedding = generate_embedding(chunk)
+
         document_chunk = DocumentChunk(
             document_id=document.id,
             chunk_index=index,
             content=chunk,
+
+            # ⭐ NEW: Store the embedding as JSON text
+            embedding=json.dumps(embedding),
         )
 
         db.add(document_chunk)
@@ -105,6 +118,9 @@ async def upload_document(
         "message": "Document uploaded successfully",
         "characters_extracted": len(extracted_text),
         "chunks_created": len(chunks),
+
+        # ⭐ NEW: Tell us how many embeddings were created
+        "embeddings_created": len(chunks),
     }
 
 
@@ -163,7 +179,48 @@ def search_documents(
         ],
     }
 
+# ============================================================
+# SEMANTIC SEARCH
+# ============================================================
 
+@router.get("/semantic-search")
+def semantic_search(
+    q: str,
+    top_k: int = 3,
+    db: Session = Depends(get_db),
+):
+    if not q.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Search query cannot be empty",
+        )
+
+    if top_k < 1 or top_k > 10:
+        raise HTTPException(
+            status_code=400,
+            detail="top_k must be between 1 and 10",
+        )
+
+    chunks = db.query(DocumentChunk).all()
+
+    if not chunks:
+        return {
+            "query": q,
+            "count": 0,
+            "results": [],
+        }
+
+    results = search_similar_chunks(
+        query=q,
+        chunks=chunks,
+        top_k=top_k,
+    )
+
+    return {
+        "query": q,
+        "count": len(results),
+        "results": results,
+    }
 # ============================================================
 # GET SINGLE DOCUMENT
 # ============================================================
@@ -194,7 +251,7 @@ def get_document(
 
 
 # ============================================================
-# ⭐ NEW: GET DOCUMENT CHUNKS
+# GET DOCUMENT CHUNKS
 # ============================================================
 
 @router.get("/{document_id}/chunks")
@@ -202,8 +259,6 @@ def get_document_chunks(
     document_id: int,
     db: Session = Depends(get_db),
 ):
-    # ⭐ NEW: Verify document exists
-
     document = (
         db.query(Document)
         .filter(Document.id == document_id)
@@ -216,8 +271,6 @@ def get_document_chunks(
             detail="Document not found",
         )
 
-    # ⭐ NEW: Retrieve chunks for this document
-
     chunks = (
         db.query(DocumentChunk)
         .filter(
@@ -226,8 +279,6 @@ def get_document_chunks(
         .order_by(DocumentChunk.chunk_index)
         .all()
     )
-
-    # ⭐ NEW: Return chunks
 
     return {
         "document_id": document_id,
@@ -238,6 +289,9 @@ def get_document_chunks(
                 "id": chunk.id,
                 "chunk_index": chunk.chunk_index,
                 "content": chunk.content,
+
+                # ⭐ NEW: Verify an embedding exists
+                "has_embedding": chunk.embedding is not None,
             }
             for chunk in chunks
         ],

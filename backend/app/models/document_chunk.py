@@ -25,6 +25,11 @@ class DocumentChunk(Base):
         nullable=False,
     )
 
+    embedding = Column(
+        Text,
+        nullable=True,
+    )
+
     document = relationship(
         "Document",
         back_populates="chunks",
