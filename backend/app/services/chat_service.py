@@ -1,9 +1,7 @@
 from typing import Any
 
 
-def build_context(
-    search_results: list[dict[str, Any]],
-) -> str:
+def build_context(search_results: list[dict[str, Any]]) -> str:
     """
     Build document context from retrieved chunks.
     """
@@ -12,6 +10,7 @@ def build_context(
 
     for result in search_results:
         context_parts.append(
+            f"Source: {result['filename']}\n"
             f"Document ID: {result['document_id']}\n"
             f"Chunk: {result['chunk_index']}\n"
             f"Content:\n{result['content']}"
