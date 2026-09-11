@@ -187,33 +187,63 @@ button {
 .document-list {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 9px;
 }
 
 .document-item {
+  padding: 11px;
+  border-radius: 9px;
+  background: #f7f8fa;
+  border: 1px solid #e5e8ed;
+}
+
+.document-main {
   display: flex;
   gap: 9px;
   align-items: flex-start;
-  padding: 9px;
-  border-radius: 8px;
-  background: #f7f8fa;
 }
 
 .document-icon {
   flex-shrink: 0;
 }
 
-.document-item strong {
+.document-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.document-info strong {
   display: block;
   font-size: 13px;
   overflow-wrap: anywhere;
 }
 
-.document-item span:not(.document-icon) {
+.document-info span {
   display: block;
   margin-top: 3px;
   font-size: 11px;
   color: #7a8494;
+}
+
+.delete-button {
+  width: 100%;
+  margin-top: 9px;
+  padding: 6px 8px;
+  border: 1px solid #e0b9b9;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #a33a3a;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.delete-button:hover:not(:disabled) {
+  background: #fff5f5;
+}
+
+.delete-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 

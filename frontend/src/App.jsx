@@ -27,23 +27,27 @@ function App() {
 
   const [isUploading, setIsUploading] = useState(false);
 
+  const [deletingDocumentId, setDeletingDocumentId] = useState(null);
 
-  // ---------------------------------------------------------
-  // Load documents and conversations when application starts
-  // ---------------------------------------------------------
+
+  // =========================================================
+  // INITIAL DATA LOAD
+  // =========================================================
+
   useEffect(() => {
     loadDocuments();
     loadConversations();
   }, []);
 
 
-  // ---------------------------------------------------------
-  // Load documents
-  // ---------------------------------------------------------
+  // =========================================================
+  // LOAD DOCUMENTS
+  // =========================================================
+
   const loadDocuments = async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/documents`
+        `${API_BASE_URL}/documents/`
       );
 
       setDocuments(response.data);
@@ -56,9 +60,10 @@ function App() {
   };
 
 
-  // ---------------------------------------------------------
-  // Load conversations
-  // ---------------------------------------------------------
+  // =========================================================
+  // LOAD CONVERSATIONS
+  // =========================================================
+
   const loadConversations = async () => {
     try {
       const response = await axios.get(
@@ -75,9 +80,10 @@ function App() {
   };
 
 
-  // ---------------------------------------------------------
-  // Handle document selection
-  // ---------------------------------------------------------
+  // =========================================================
+  // FILE SELECTION
+  // =========================================================
+
   const handleFileChange = (event) => {
     const file = event.target.files?.[0];
 
@@ -90,9 +96,10 @@ function App() {
   };
 
 
-  // ---------------------------------------------------------
-  // Upload document
-  // ---------------------------------------------------------
+  // =========================================================
+  // UPLOAD DOCUMENT
+  // =========================================================
+
   const uploadDocument = async () => {
     if (!selectedFile) {
       setUploadStatus(
@@ -110,7 +117,10 @@ function App() {
     );
 
     setIsUploading(true);
-    setUploadStatus("Uploading document...");
+
+    setUploadStatus(
+      "Uploading document..."
+    );
 
     try {
       const response = await axios.post(
@@ -125,6 +135,15 @@ function App() {
       );
 
       setSelectedFile(null);
+
+      const fileInput =
+        document.getElementById(
+          "document-upload"
+        );
+
+      if (fileInput) {
+        fileInput.value = "";
+      }
 
       await loadDocuments();
 
@@ -148,9 +167,63 @@ function App() {
   };
 
 
-  // ---------------------------------------------------------
-  // Start a new conversation
-  // ---------------------------------------------------------
+  // =========================================================
+  // DELETE DOCUMENT
+  // =========================================================
+
+  const deleteDocument = async (
+    documentId,
+    filename
+  ) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${filename}"?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingDocumentId(documentId);
+
+    try {
+      await axios.delete(
+        `${API_BASE_URL}/documents/${documentId}`
+      );
+
+      setUploadStatus(
+        `${filename} deleted successfully.`
+      );
+
+      await loadDocuments();
+
+      // Clear sources if the deleted document
+      // was being displayed in the current chat.
+      setSources([]);
+
+    } catch (error) {
+      console.error(
+        "Unable to delete document:",
+        error
+      );
+
+      const detail =
+        error.response?.data?.detail;
+
+      setUploadStatus(
+        detail ||
+        "Unable to delete the document."
+      );
+
+    } finally {
+      setDeletingDocumentId(null);
+    }
+  };
+
+
+  // =========================================================
+  // START NEW CONVERSATION
+  // =========================================================
+
   const startNewConversation = () => {
     setConversationId(null);
 
@@ -162,16 +235,19 @@ function App() {
   };
 
 
-  // ---------------------------------------------------------
-  // Load an existing conversation
-  // ---------------------------------------------------------
+  // =========================================================
+  // OPEN EXISTING CONVERSATION
+  // =========================================================
+
   const openConversation = async (id) => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/chat/conversations/${id}`
       );
 
-      setConversationId(response.data.id);
+      setConversationId(
+        response.data.id
+      );
 
       setMessages(
         response.data.messages || []
@@ -190,61 +266,69 @@ function App() {
   };
 
 
-  // ---------------------------------------------------------
-  // Send chat question
-  // ---------------------------------------------------------
+  // =========================================================
+  // SEND QUESTION
+  // =========================================================
+
   const sendQuestion = async () => {
-    if (!question.trim() || isLoading) {
+    if (
+      !question.trim() ||
+      isLoading
+    ) {
       return;
     }
 
-    const currentQuestion = question.trim();
+    const currentQuestion =
+      question.trim();
 
     setQuestion("");
 
     setIsLoading(true);
 
-    // Immediately display the user's message.
-    setMessages((previousMessages) => [
-      ...previousMessages,
-      {
-        role: "user",
-        content: currentQuestion,
-      },
-    ]);
+    // Display user's message immediately.
+    setMessages(
+      (previousMessages) => [
+        ...previousMessages,
+        {
+          role: "user",
+          content: currentQuestion,
+        },
+      ]
+    );
 
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/chat/ask`,
-        {
-          question: currentQuestion,
-          conversation_id: conversationId,
-          top_k: 3,
-        }
-      );
+      const response =
+        await axios.post(
+          `${API_BASE_URL}/chat/ask`,
+          {
+            question: currentQuestion,
+            conversation_id:
+              conversationId,
+            top_k: 3,
+          }
+        );
 
-      const data = response.data;
+      const data =
+        response.data;
 
-      // Save conversation ID returned by backend.
       setConversationId(
         data.conversation_id
       );
 
-      // Add assistant response.
-      setMessages((previousMessages) => [
-        ...previousMessages,
-        {
-          role: "assistant",
-          content: data.answer,
-        },
-      ]);
+      setMessages(
+        (previousMessages) => [
+          ...previousMessages,
+          {
+            role: "assistant",
+            content: data.answer,
+          },
+        ]
+      );
 
       setSources(
         data.sources || []
       );
 
-      // Refresh conversation list so the new
-      // conversation appears in the sidebar.
       await loadConversations();
 
     } catch (error) {
@@ -253,15 +337,17 @@ function App() {
         error
       );
 
-      setMessages((previousMessages) => [
-        ...previousMessages,
-        {
-          role: "assistant",
-          content:
-            "Unable to process the question. " +
-            "Please make sure the backend and Ollama are running.",
-        },
-      ]);
+      setMessages(
+        (previousMessages) => [
+          ...previousMessages,
+          {
+            role: "assistant",
+            content:
+              "Unable to process the question. " +
+              "Please make sure the backend and Ollama are running.",
+          },
+        ]
+      );
 
     } finally {
       setIsLoading(false);
@@ -269,10 +355,13 @@ function App() {
   };
 
 
-  // ---------------------------------------------------------
-  // Allow Enter to send a question
-  // ---------------------------------------------------------
-  const handleQuestionKeyDown = (event) => {
+  // =========================================================
+  // ENTER KEY HANDLING
+  // =========================================================
+
+  const handleQuestionKeyDown = (
+    event
+  ) => {
     if (
       event.key === "Enter" &&
       !event.shiftKey
@@ -284,9 +373,10 @@ function App() {
   };
 
 
-  // ---------------------------------------------------------
-  // Create a useful conversation title
-  // ---------------------------------------------------------
+  // =========================================================
+  // CONVERSATION TITLE
+  // =========================================================
+
   const getConversationTitle = (
     conversation
   ) => {
@@ -311,50 +401,90 @@ function App() {
   };
 
 
+  // =========================================================
+  // FORMAT DATE
+  // =========================================================
+
+  const formatDate = (
+    createdAt
+  ) => {
+    if (!createdAt) {
+      return "";
+    }
+
+    return new Date(
+      createdAt
+    ).toLocaleDateString();
+  };
+
+
+  // =========================================================
+  // UI
+  // =========================================================
+
   return (
     <div className="app">
 
       {/* =====================================================
           LEFT SIDEBAR
       ====================================================== */}
+
       <aside className="sidebar">
 
         <div className="sidebar-header">
-          <h1>Enterprise Knowledge</h1>
 
-          <p>AI Assistant</p>
+          <h1>
+            Enterprise Knowledge
+          </h1>
+
+          <p>
+            AI Assistant
+          </p>
+
         </div>
 
 
         {/* ---------------------------------------------------
-            New Conversation
+            NEW CHAT
         ---------------------------------------------------- */}
+
         <button
           className="new-chat-button"
-          onClick={startNewConversation}
+          onClick={
+            startNewConversation
+          }
         >
           + New Chat
         </button>
 
 
         {/* ---------------------------------------------------
-            Conversations
+            CONVERSATIONS
         ---------------------------------------------------- */}
+
         <section className="sidebar-section">
 
-          <h2>Conversations</h2>
+          <h2>
+            Conversations
+          </h2>
 
           {conversations.length === 0 ? (
+
             <p className="empty-state">
               No conversations yet.
             </p>
+
           ) : (
+
             <div className="conversation-list">
 
               {conversations.map(
                 (conversation) => (
+
                   <button
-                    key={conversation.id}
+                    key={
+                      conversation.id
+                    }
                     className={
                       conversationId ===
                       conversation.id
@@ -367,6 +497,7 @@ function App() {
                       )
                     }
                   >
+
                     <span className="conversation-icon">
                       💬
                     </span>
@@ -376,22 +507,31 @@ function App() {
                         conversation
                       )}
                     </span>
+
                   </button>
+
                 )
               )}
 
             </div>
+
           )}
 
         </section>
 
 
         {/* ---------------------------------------------------
-            Documents
+            KNOWLEDGE BASE
         ---------------------------------------------------- */}
+
         <section className="sidebar-section">
 
-          <h2>Knowledge Base</h2>
+          <h2>
+            Knowledge Base
+          </h2>
+
+
+          {/* Upload */}
 
           <div className="upload-area">
 
@@ -399,18 +539,24 @@ function App() {
               id="document-upload"
               type="file"
               accept=".pdf,.txt"
-              onChange={handleFileChange}
+              onChange={
+                handleFileChange
+              }
             />
 
             {selectedFile && (
+
               <p className="selected-file">
                 {selectedFile.name}
               </p>
+
             )}
 
             <button
               className="upload-button"
-              onClick={uploadDocument}
+              onClick={
+                uploadDocument
+              }
               disabled={
                 !selectedFile ||
                 isUploading
@@ -422,43 +568,94 @@ function App() {
             </button>
 
             {uploadStatus && (
+
               <p className="upload-status">
                 {uploadStatus}
               </p>
+
             )}
 
           </div>
 
 
+          {/* Documents */}
+
           <div className="document-list">
 
             {documents.length === 0 ? (
+
               <p className="empty-state">
                 No documents uploaded yet.
               </p>
+
             ) : (
+
               documents.map(
                 (document) => (
+
                   <div
                     className="document-item"
-                    key={document.id}
+                    key={
+                      document.id
+                    }
                   >
-                    <span className="document-icon">
-                      📄
-                    </span>
 
-                    <div>
-                      <strong>
-                        {document.filename}
-                      </strong>
+                    <div className="document-main">
 
-                      <span>
-                        Document #{document.id}
+                      <span className="document-icon">
+                        📄
                       </span>
+
+                      <div className="document-info">
+
+                        <strong>
+                          {document.filename}
+                        </strong>
+
+                        <span>
+                          Document #{document.id}
+                        </span>
+
+                        <span>
+                          {document.chunk_count} chunks
+                        </span>
+
+                        <span>
+                          {formatDate(
+                            document.created_at
+                          )}
+                        </span>
+
+                      </div>
+
                     </div>
+
+
+                    <button
+                      className="delete-button"
+                      onClick={() =>
+                        deleteDocument(
+                          document.id,
+                          document.filename
+                        )
+                      }
+                      disabled={
+                        deletingDocumentId ===
+                        document.id
+                      }
+                      title="Delete document"
+                    >
+                      {deletingDocumentId ===
+                      document.id
+                        ? "..."
+                        : "Delete"}
+                    </button>
+
                   </div>
+
                 )
               )
+
             )}
 
           </div>
@@ -469,36 +666,46 @@ function App() {
 
 
       {/* =====================================================
-          MAIN CHAT
+          CHAT PANEL
       ====================================================== */}
+
       <main className="chat-panel">
 
         <header className="chat-header">
 
           <div>
-            <h2>Enterprise Knowledge Assistant</h2>
+
+            <h2>
+              Enterprise Knowledge Assistant
+            </h2>
 
             <p>
-              Ask questions about your uploaded
-              enterprise documents.
+              Ask questions about your
+              uploaded enterprise documents.
             </p>
+
           </div>
 
+
           {conversationId && (
+
             <span className="conversation-id">
               Conversation #{conversationId}
             </span>
+
           )}
 
         </header>
 
 
         {/* ---------------------------------------------------
-            Messages
+            MESSAGES
         ---------------------------------------------------- */}
+
         <div className="messages">
 
           {messages.length === 0 ? (
+
             <div className="welcome-message">
 
               <div className="welcome-icon">
@@ -510,22 +717,28 @@ function App() {
               </h2>
 
               <p>
-                Ask a question about the documents
-                in your knowledge base.
+                Ask a question about the
+                documents in your knowledge base.
               </p>
 
               <div className="example-question">
+
                 Example:
+
                 <strong>
                   How much vacation time do
                   employees receive?
                 </strong>
+
               </div>
 
             </div>
+
           ) : (
+
             messages.map(
               (message, index) => (
+
                 <div
                   key={
                     message.id ||
@@ -539,9 +752,11 @@ function App() {
                 >
 
                   <div className="message-role">
+
                     {message.role === "user"
                       ? "You"
                       : "AI Assistant"}
+
                   </div>
 
                   <div className="message-content">
@@ -549,11 +764,15 @@ function App() {
                   </div>
 
                 </div>
+
               )
             )
+
           )}
 
+
           {isLoading && (
+
             <div className="message assistant-message">
 
               <div className="message-role">
@@ -565,20 +784,24 @@ function App() {
               </div>
 
             </div>
+
           )}
 
         </div>
 
 
         {/* ---------------------------------------------------
-            Chat Input
+            CHAT INPUT
         ---------------------------------------------------- */}
+
         <div className="chat-input-area">
 
           <textarea
             value={question}
             onChange={(event) =>
-              setQuestion(event.target.value)
+              setQuestion(
+                event.target.value
+              )
             }
             onKeyDown={
               handleQuestionKeyDown
@@ -607,13 +830,16 @@ function App() {
 
 
       {/* =====================================================
-          RIGHT SOURCES PANEL
+          SOURCES PANEL
       ====================================================== */}
+
       <aside className="sources-panel">
 
         <div className="sources-header">
 
-          <h2>Sources</h2>
+          <h2>
+            Sources
+          </h2>
 
           <p>
             Retrieved document references
@@ -623,9 +849,12 @@ function App() {
 
 
         {sources.length === 0 ? (
+
           <div className="sources-empty">
 
-            <span>🔎</span>
+            <span>
+              🔎
+            </span>
 
             <p>
               Sources will appear here after
@@ -633,11 +862,14 @@ function App() {
             </p>
 
           </div>
+
         ) : (
+
           <div className="source-list">
 
             {sources.map(
               (source, index) => (
+
                 <div
                   className="source-card"
                   key={
@@ -668,10 +900,12 @@ function App() {
                   </div>
 
                 </div>
+
               )
             )}
 
           </div>
+
         )}
 
       </aside>

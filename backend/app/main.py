@@ -5,25 +5,39 @@ from backend.app.api.chat import router as chat_router
 from backend.app.api.documents import router as documents_router
 from backend.app.core.database import Base, engine
 
-# Import models so SQLAlchemy registers all tables.
 from backend.app.models.document import Document
 from backend.app.models.document_chunk import DocumentChunk
 from backend.app.models.conversation import Conversation
 from backend.app.models.conversation_message import ConversationMessage
 
 
-Base.metadata.create_all(bind=engine)
+# ============================================================
+# DATABASE INITIALIZATION
+# ============================================================
 
+Base.metadata.create_all(
+    bind=engine
+)
+
+
+# ============================================================
+# FASTAPI APPLICATION
+# ============================================================
 
 app = FastAPI(
     title="Enterprise Knowledge Assistant",
-    description="RAG-based enterprise document question answering system",
+    description=(
+        "RAG-based enterprise document "
+        "question answering system"
+    ),
     version="1.0.0",
 )
 
 
-# Allow the React development frontend to communicate
-# with the FastAPI backend.
+# ============================================================
+# CORS
+# ============================================================
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -36,12 +50,39 @@ app.add_middleware(
 )
 
 
-app.include_router(documents_router)
-app.include_router(chat_router)
+# ============================================================
+# API ROUTES
+# ============================================================
 
+app.include_router(
+    documents_router
+)
+
+app.include_router(
+    chat_router
+)
+
+
+# ============================================================
+# ROOT ENDPOINT
+# ============================================================
 
 @app.get("/")
 def root():
     return {
-        "message": "Enterprise Knowledge Assistant API is running"
+        "message": (
+            "Enterprise Knowledge Assistant "
+            "API is running"
+        )
+    }
+
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "healthy"
     }
