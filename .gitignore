@@ -21,3 +21,8 @@ node_modules/
 # OS
 .DS_Store
 Thumbs.db
+# Local databases / build output
+*.db
+*.sqlite
+dist/
+.pytest_cache/

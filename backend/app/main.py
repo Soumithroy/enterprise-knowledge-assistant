@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.chat import router as chat_router
 from backend.app.api.documents import router as documents_router
+from backend.app.core.config import settings
 from backend.app.core.database import Base, engine
 
 from backend.app.models.document import Document
@@ -41,8 +42,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
+        origin.strip()
+        for origin in settings.cors_origins.split(",")
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -84,5 +85,7 @@ def root():
 @app.get("/health")
 def health_check():
     return {
-        "status": "healthy"
+        "status": "healthy",
+        "llm_provider": settings.llm_provider,
+        "embedding_backend": settings.embedding_backend,
     }

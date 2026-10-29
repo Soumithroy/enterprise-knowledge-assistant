@@ -1,11 +1,12 @@
 import json
 from typing import Any
 
+from backend.app.core.config import settings
 from backend.app.services.embedding_service import generate_embedding
 
 
 # Minimum similarity required for a chunk to be considered relevant.
-DEFAULT_SIMILARITY_THRESHOLD = 0.35
+DEFAULT_SIMILARITY_THRESHOLD = settings.similarity_threshold
 
 
 def calculate_cosine_similarity(

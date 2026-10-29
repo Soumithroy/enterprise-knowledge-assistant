@@ -1,14 +1,13 @@
-import os
-from pathlib import Path
+import logging
+import re
 
-from dotenv import load_dotenv
-from ollama import chat
+import httpx
 
+from backend.app.core.config import settings
 
-BACKEND_DIR = Path(__file__).resolve().parents[2]
-ENV_FILE = BACKEND_DIR / ".env"
+logger = logging.getLogger(__name__)
 
-load_dotenv(dotenv_path=ENV_FILE)
+NOT_FOUND = "I could not find the answer in the uploaded documents."
 
 
 def generate_answer(
@@ -25,9 +24,10 @@ def generate_answer(
     """
 
     if not context.strip():
-        return "I could not find the answer in the uploaded documents."
+        return NOT_FOUND
 
-    model = os.getenv("OLLAMA_MODEL", "llama3.2")
+    if settings.llm_provider == "extractive":
+        return _extractive_answer(question, context)
 
     history_section = ""
 
@@ -70,14 +70,60 @@ CURRENT USER QUESTION:
 {question}
 """
 
-    response = chat(
-        model=model,
-        messages=[
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
-    )
+    messages = [{"role": "user", "content": prompt}]
 
+    try:
+        if settings.llm_provider == "openai":
+            return _openai_chat(messages)
+        return _ollama_chat(messages)
+    except Exception as exc:  # LLM down / misconfigured -> degrade gracefully
+        logger.warning("LLM provider %s failed (%s); using extractive fallback", settings.llm_provider, exc)
+        return _extractive_answer(question, context)
+
+
+def _ollama_chat(messages: list[dict]) -> str:
+    from ollama import Client
+
+    response = Client(host=settings.ollama_host).chat(
+        model=settings.ollama_model,
+        messages=messages,
+    )
     return response.message.content
+
+
+def _openai_chat(messages: list[dict]) -> str:
+    if not settings.openai_api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set")
+
+    response = httpx.post(
+        "https://api.openai.com/v1/chat/completions",
+        headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+        json={"model": settings.openai_model, "messages": messages, "temperature": 0},
+        timeout=60,
+    )
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"]
+
+
+_STOPWORDS = set(
+    "the a an is are was what which who how many much do does of to in on for and or "
+    "with by at from it this that be can i we you our your".split()
+)
+
+
+def _extractive_answer(question: str, context: str) -> str:
+    """No-LLM fallback: return the sentence(s) from the context that best match the question."""
+    terms = {w for w in re.findall(r"[a-z0-9]+", question.lower()) if w not in _STOPWORDS}
+    content = "\n".join(
+        line for line in context.splitlines()
+        if line.strip() and not line.startswith(("Source:", "Document ID:", "Chunk:", "Content:", "---"))
+    )
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", content) if s.strip()]
+
+    scored = sorted(
+        ((len(terms & set(re.findall(r"[a-z0-9]+", s.lower()))), s) for s in sentences),
+        key=lambda item: -item[0],
+    )
+    top_score = scored[0][0] if scored else 0
+    best = [s for score, s in scored[:2] if score > 0 and score >= 0.75 * top_score]
+    return " ".join(best) if best else NOT_FOUND
